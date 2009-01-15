@@ -19,7 +19,7 @@ class PokerBot
       r1 = @oh["$$pr1"]
 
       if r0 == r1 and r0 >= 10 # If it's a pair above TT
-	return 1.0
+        return 1.0
       end
     end
     # Return 0 in other cases
