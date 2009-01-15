@@ -1,0 +1,19 @@
+
+CFLAGS = -Wall
+LDFLAGS = -shared whuser.dll.spec -mno-cygwin
+
+CC = @CC@
+CFLAGS += @RUBY_CPPFLAGS@
+LDFLAGS += @RUBY_LDFLAGS@
+
+whuser.dll: librubyholdem.dll.so
+	cp librubyholdem.dll.so whuser.dll
+
+librubyholdem.dll.so: rubyholdem.o
+	$(CC) $(LDFLAGS) -o $@ rubyholdem.o
+
+.c.o:
+	$(CC) -c $(CFLAGS) -o $@ $<
+
+clean:
+	rm -f rubyholdem.o librubyholdem.dll whuser.dll
