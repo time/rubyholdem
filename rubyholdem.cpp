@@ -18,6 +18,7 @@
 */
 
 //#define DEBUG_THREADS
+#define _CRT_SECURE_NO_DEPRECATE
 
 #ifdef __WINE__
 #undef _WIN32
@@ -27,7 +28,6 @@
 #include <ruby.h>
 #endif
 
-#include <stdio.h>
 #include <windef.h>
 #include <winbase.h>
 
@@ -38,6 +38,30 @@
 
 #define RH_PROCESS_MESSAGE 1
 #define RH_EXIT 2
+
+void rh_log(const char *format, ...)
+{
+#ifdef __WINE__
+	va_list args;
+	va_start(args, format);
+	vprintf(format, args);
+#else
+	int size = 0;
+	char text[100];
+	memset(text, 0, sizeof(text));
+	va_list args;
+	va_start(args, format);
+#if 1
+	FILE *f = fopen("rubyholdem.log", "at");
+	vfprintf(f, format, args);
+	fclose(f);
+#else
+	size = vsnprintf(text, sizeof(text) - 1, format, args);
+	MessageBox(NULL, text, "RubyHoldem message", 0);
+#endif
+
+#endif // __WINE__
+}
 
 struct holdem_player {
   char            m_name[16]          ;       //player name if known
@@ -88,7 +112,7 @@ const char *rh_symbol_name;
 bool rh_symbol_error;
 double rh_symbol_result;
 
-extern "C" double process_message( const char* message, const void* param );
+extern "C" double __declspec(dllexport) process_message( const char* message, const void* param );
 extern "C" BOOL APIENTRY DllMain(HANDLE module, DWORD reason, LPVOID reserved);
 
 VALUE rh_module;
@@ -103,9 +127,14 @@ VALUE rh_safe_call_failed(VALUE arg, VALUE exception) {
   char *backtrace_lines = RSTRING_PTR(rb_funcall(backtrace, rb_intern("join"), 1, rb_str_new2("\n")));
   
   
-  printf("Unhandled Ruby exception occured in %s\n", description);
-  printf("%s (%s)\n", message, klass_name);
-  printf("%s\n", backtrace_lines);
+  rh_log(
+	  "Unhandled Ruby exception occured in %s\n"
+	  "%s (%s)\n"
+	  "%s\n",
+	  description,
+	  message, klass_name,
+	  backtrace_lines
+	  );
   return rb_float_new(0.0);
 }
 
@@ -145,7 +174,7 @@ void rh_emit_symbol_request()
   
   if (!SetEvent(rh_event_symbol_request))
   {
-    printf("SetEvent failed (%d)\n", GetLastError());
+    rh_log("SetEvent failed (%d)\n", GetLastError());
     return;
   }
   dwWaitResult = WaitForSingleObject(rh_event_symbol_request_done, INFINITE);
@@ -157,7 +186,7 @@ void rh_emit_symbol_request()
       
     // An error occurred
     default:
-      printf("RubyHoldem thread: Wait error (%d)\n", GetLastError());
+      rh_log("RubyHoldem thread: Wait error (%d)\n", GetLastError());
   }
 }
 
@@ -168,7 +197,7 @@ VALUE rh_get_symbol(VALUE self, VALUE chair, VALUE name)
   char *name_ptr = RSTRING_PTR(name);
   
 #ifdef DEBUG_THREADS
-  printf("Thread %d getting symbol %s\n", GetCurrentThreadId(), name_ptr);
+  rh_log("Thread %d getting symbol %s\n", GetCurrentThreadId(), name_ptr);
 #endif
   if (!get_openholdem_symbol)
     rb_raise(rb_eRuntimeError, "Unable to get symbol: pfgws not received");
@@ -184,7 +213,7 @@ VALUE rh_get_symbol(VALUE self, VALUE chair, VALUE name)
   if (error)
     rb_raise(rb_eRuntimeError, "OpenHoldem returned an error while getting symbol \"%s\"", name_ptr);
 #ifdef DEBUG_THREADS
-  printf("Thread %d finished getting symbol %s\n", GetCurrentThreadId(), name_ptr);
+  rh_log("Thread %d finished getting symbol %s\n", GetCurrentThreadId(), name_ptr);
 #endif
   return rb_float_new(result);
 }
@@ -194,7 +223,7 @@ void process_symbol_request()
   rh_symbol_result = get_openholdem_symbol(rh_symbol_chair, rh_symbol_name, rh_symbol_error);
   if (!SetEvent(rh_event_symbol_request_done))
   {
-    printf("SetEvent failed (%d)\n", GetLastError());
+    rh_log("SetEvent failed (%d)\n", GetLastError());
     return;
   }
 }
@@ -211,11 +240,11 @@ VALUE rh_init_module()
 void rh_job_done()
 {
 #ifdef DEBUG_THREADS
-  printf("Thread %d sets job to done\n", GetCurrentThreadId());
+  rh_log("Thread %d sets job to done\n", GetCurrentThreadId());
 #endif
   if (!SetEvent(rh_event_done))
   {
-    printf("SetEvent failed (%d)\n", GetLastError());
+    rh_log("SetEvent failed (%d)\n", GetLastError());
     return;
   }
 }
@@ -229,12 +258,12 @@ void rh_start_job(int type)
   rh_event_type = type;
   if (!SetEvent(rh_event_job))
   {
-    printf("SetEvent failed (%d)\n", GetLastError());
+    rh_log("SetEvent failed (%d)\n", GetLastError());
     return;
   }
   
 #ifdef DEBUG_THREADS
-  printf("Thread %d waiting for job done\n", GetCurrentThreadId());
+  rh_log("Thread %d waiting for job done\n", GetCurrentThreadId());
 #endif
   events[0] = rh_event_done;
   events[1] = rh_event_symbol_request;
@@ -246,7 +275,7 @@ void rh_start_job(int type)
       // rh_event_done was signaled
       case WAIT_OBJECT_0:
 #ifdef DEBUG_THREADS
-        printf("Thread %d: job done\n", GetCurrentThreadId());
+        rh_log("Thread %d: job done\n", GetCurrentThreadId());
 #endif
         job_done = 1;
         break;
@@ -254,14 +283,14 @@ void rh_start_job(int type)
         // rh_event_symbol_request was signaled
       case WAIT_OBJECT_0 + 1:
 #ifdef DEBUG_THREADS
-        printf("Thread %d: symbol request\n", GetCurrentThreadId());
+        rh_log("Thread %d: symbol request\n", GetCurrentThreadId());
 #endif
         process_symbol_request();
         break;
         
       // An error occurred
       default:
-        printf("Error waiting for job done: Wait error (%d)\n", GetLastError());
+        rh_log("Error waiting for job done: Wait error (%d)\n", GetLastError());
         return;
     }
   }
@@ -273,7 +302,7 @@ double process_message( const char* message, const void* param )
     return 0;
   
 #ifdef DEBUG_THREADS
-  printf("process_message in thread %d\n", GetCurrentThreadId());
+  rh_log("process_message in thread %d\n", GetCurrentThreadId());
 #endif
 
   rh_message = message;
@@ -286,10 +315,10 @@ void rh_process_message()
 {
   const char *message = rh_message;
   const void *param = rh_param;
-  VALUE result;
+  VALUE result = Qnil;
   
 #ifdef DEBUG_THREADS
-  printf("rh_process_message in thread %d (message: %s)\n", GetCurrentThreadId(), message);
+  rh_log("rh_process_message in thread %d (message: %s)\n", GetCurrentThreadId(), message);
 #endif
 
   if (strcmp(message, "query") == 0)
@@ -299,7 +328,7 @@ void rh_process_message()
   else if (strcmp(message, "event") == 0)
     result = rh_safe_call("rh_process_event", (rh_function)rh_process_event, rb_str_new2((char*)param));
   else if (strcmp(message,"pfgws") == 0) {
-    printf("pfgws received\n");
+    rh_log("pfgws received\n");
     get_openholdem_symbol = (pfgws_t)param;
     rh_result = 0.0;
   }
@@ -316,7 +345,7 @@ DWORD WINAPI rh_thread_proc(LPVOID lpParam)
   int must_exit = 0;
 
 #ifdef DEBUG_THREADS
-  printf("RubyHoldem thread %d starting\n", GetCurrentThreadId());
+  rh_log("RubyHoldem thread %d starting\n", GetCurrentThreadId());
 #endif
 
   ruby_init();
@@ -325,7 +354,7 @@ DWORD WINAPI rh_thread_proc(LPVOID lpParam)
   while (!must_exit)
   {
 #ifdef DEBUG_THREADS
-    printf("RubyHoldem thread %d waiting for event...\n", GetCurrentThreadId());
+    rh_log("RubyHoldem thread %d waiting for event...\n", GetCurrentThreadId());
 #endif
 
     dwWaitResult = WaitForSingleObject(rh_event_job, INFINITE);
@@ -335,19 +364,19 @@ DWORD WINAPI rh_thread_proc(LPVOID lpParam)
       // Event object was signaled
       case WAIT_OBJECT_0: 
 #ifdef DEBUG_THREADS
-        printf("Event occured in RubyHoldem thread %d\n", GetCurrentThreadId());
+        rh_log("Event occured in RubyHoldem thread %d\n", GetCurrentThreadId());
 #endif
         switch(rh_event_type)
         {
           case RH_EXIT:
 #ifdef DEBUG_THREADS
-            printf("Event is RH_EXIT\n");
+            rh_log("Event is RH_EXIT\n");
 #endif
             must_exit = 1;
             break;
           case RH_PROCESS_MESSAGE:
 #ifdef DEBUG_THREADS
-            printf("Event is RH_PROCESS_MESSAGE\n");
+            rh_log("Event is RH_PROCESS_MESSAGE\n");
 #endif
             rh_process_message();
             break;
@@ -356,17 +385,17 @@ DWORD WINAPI rh_thread_proc(LPVOID lpParam)
 
       // An error occurred
       default:
-        printf("RubyHoldem thread: Wait error (%d)\n", GetLastError());
+        rh_log("RubyHoldem thread: Wait error (%d)\n", GetLastError());
         return 0; 
     }
     if (!SetEvent(rh_event_done))
     {
-      printf("SetEvent rh_event_done failed (%d)\n", GetLastError());
+      rh_log("SetEvent rh_event_done failed (%d)\n", GetLastError());
     }
   }
   ruby_finalize();
 #ifdef DEBUG_THREADS
-  printf("RubyHoldem thread %d finished\n", GetCurrentThreadId());
+  rh_log("RubyHoldem thread %d finished\n", GetCurrentThreadId());
 #endif
 
   return 1;
@@ -376,9 +405,9 @@ void rh_init()
 {
   DWORD dwThreadID;
   
-  printf("rh_init();\n");
+  rh_log("rh_init();\n");
 #ifdef DEBUG_THREADS
-  printf("rh_init in thread %d\n", GetCurrentThreadId());
+  rh_log("rh_init in thread %d\n", GetCurrentThreadId());
 #endif
 
   rh_event_job = CreateEvent(
@@ -390,7 +419,7 @@ void rh_init()
 
   if (rh_event_job == NULL)
   {
-    printf("CreateEvent for job failed (%d)\n", GetLastError());
+    rh_log("CreateEvent for job failed (%d)\n", GetLastError());
     return;
   }
   
@@ -403,7 +432,7 @@ void rh_init()
 
   if (rh_event_done == NULL)
   {
-    printf("CreateEvent for done failed (%d)\n", GetLastError());
+    rh_log("CreateEvent for done failed (%d)\n", GetLastError());
     return;
   }
 
@@ -416,7 +445,7 @@ void rh_init()
 
   if (rh_event_symbol_request == NULL)
   {
-    printf("CreateEvent for symbol request failed (%d)\n", GetLastError());
+    rh_log("CreateEvent for symbol request failed (%d)\n", GetLastError());
     return;
   }
 
@@ -429,7 +458,7 @@ void rh_init()
 
   if (rh_event_symbol_request_done == NULL)
   {
-    printf("CreateEvent for symbol request done failed (%d)\n", GetLastError());
+    rh_log("CreateEvent for symbol request done failed (%d)\n", GetLastError());
     return;
   }
 
@@ -442,7 +471,7 @@ void rh_init()
     &dwThreadID);
   if (rh_thread == NULL)
   {
-    printf("CreateThread failed (%d)\n", GetLastError());
+    rh_log("CreateThread failed (%d)\n", GetLastError());
   }
 }
 
@@ -450,25 +479,25 @@ void rh_finalize()
 {
   //DWORD dwWaitResult;
   
-  printf("rh_finalize();\n");
+  rh_log("rh_finalize();\n");
 #ifdef DEBUG_THREADS
-  printf("rh_finalize in thread %d\n", GetCurrentThreadId());
+  rh_log("rh_finalize in thread %d\n", GetCurrentThreadId());
 #endif
   
   rh_start_job(RH_EXIT);
   
 #if 0 // disabled, doesn't work but the thread exits, don't know why
-  printf("Waiting for RubyHoldem thread in thread %d\n", GetCurrentThreadId());
+  rh_log("Waiting for RubyHoldem thread in thread %d\n", GetCurrentThreadId());
   dwWaitResult = WaitForSingleObject(rh_thread, INFINITE);
   switch (dwWaitResult)
   {
     case WAIT_OBJECT_0:
-      printf("RubyHoldem thread exited\n");
+      rh_log("RubyHoldem thread exited\n");
       break;
       
       // An error occurred
     default: 
-      printf("WaitForMultipleObjects failed (%d)\n", GetLastError());
+      rh_log("WaitForMultipleObjects failed (%d)\n", GetLastError());
       return;
   }
 #endif

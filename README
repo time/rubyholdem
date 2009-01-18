@@ -1,0 +1,27 @@
+RubyHoldem is a DLL for OpenHoldem that transfers requests to Ruby code.
+
+To build it with Visual Studio 2005:
+* Download RubyHoldem source code (with git or with the "Download" link on GitHub)
+* Extract it somewhere if needed
+* Download Ruby source code (for example ftp://ftp.ruby-lang.org/pub/ruby/1.8/ruby-1.8.7-p72.tar.gz)
+* Extract it inside rubyholdem directory
+* Rename ruby's directory "ruby-1.8.XXX" to "ruby"
+* Start Visual Studio 2005
+* Select "Tools" / "Visual Studio 2005 Command Prompt"
+* Go to Ruby source directory
+* Run win32\configure.bat
+* Run nmake
+* Now you should have msvcr80-ruby18-static.lib in the Ruby directory
+* Open the RubyHoldem Visual Studio project
+* Press F7
+* Now you should have whuser.dll in the RubyHoldem directory
+
+To use it:
+You need a pokerbot.rb. You can get a sample in pokerbot_sample.rb.
+
+The files rubyholdem.rb and pokerbot.rb must be in the "current directory" when the DLL is loaded.
+Generally this means they must be in the same directory as the DLL.
+
+All debug output and errors are written to rubyholdem.log, in the "current directory".
+
+The file pokerbot.rb is reloaded automatically at each request if it has changed.
