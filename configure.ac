@@ -4,7 +4,7 @@
 #AC_PREREQ(2.61)
 AC_INIT(RubyHoldem, 0.1, time.in.world@gmail.com)
 
-AC_CONFIG_SRCDIR([rubyholdem.c])
+AC_CONFIG_SRCDIR([rubyholdem.cpp])
 AC_CONFIG_HEADER([config.h])
 AC_CONFIG_MACRO_DIR([m4])
 

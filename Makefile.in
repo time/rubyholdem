@@ -12,7 +12,7 @@ whuser.dll: librubyholdem.dll.so
 librubyholdem.dll.so: rubyholdem.o
 	$(CC) $(LDFLAGS) -o $@ rubyholdem.o
 
-.c.o:
+.cpp.o:
 	$(CC) -c $(CFLAGS) -o $@ $<
 
 clean:
