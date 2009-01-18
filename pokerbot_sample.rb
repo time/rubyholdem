@@ -10,8 +10,6 @@ class PokerBot
   end
 
   def process_query(query)
-    puts "Received query: #{query.inspect}"
-
     case query
     when "dll$rais" # OpenHoldem found dll$rais in a formula and requests a value
       # Get hole card ranks
@@ -21,6 +19,8 @@ class PokerBot
       if r0 == r1 and r0 >= 10 # If it's a pair above TT
         return 1.0
       end
+    when "dll$rand"
+      return rand
     end
     # Return 0 in other cases
     0.0
