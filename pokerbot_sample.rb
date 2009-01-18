@@ -6,6 +6,7 @@ class PokerBot
   
   def process_state(state)
     # The state is passed in a raw string containing the structure that must be decoded if needed
+    # Here we do nothing and always return 0.0
     0.0
   end
 
