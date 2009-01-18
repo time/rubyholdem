@@ -20,6 +20,7 @@ class PokerBot
         return 1.0
       end
     when "dll$rand"
+      # Return a random number between 0.0 and 1.0
       return rand
     end
     # Return 0 in other cases
