@@ -37,6 +37,7 @@
 # define RSTRING_LEN(s) (RSTRING(s)->len)
 #endif
 
+#define RH_NO_EVENT 0
 #define RH_PROCESS_MESSAGE 1
 #define RH_EXIT 2
 
@@ -102,7 +103,7 @@ HANDLE rh_event_done;
 HANDLE rh_event_symbol_request;
 HANDLE rh_event_symbol_request_done;
 HANDLE rh_thread;
-int rh_event_type = 0;
+int rh_event_type = RH_NO_EVENT;
 
 const char *rh_message;
 const void *rh_param;
@@ -243,6 +244,7 @@ void rh_job_done()
 #ifdef DEBUG_THREADS
   rh_log("Thread %d sets job to done\n", GetCurrentThreadId());
 #endif
+  rh_event_type = RH_NO_EVENT;
   if (!SetEvent(rh_event_done))
   {
     rh_log("SetEvent failed (%d)\n", GetLastError());
@@ -256,7 +258,13 @@ void rh_start_job(int type)
   HANDLE events[2];
   int job_done = 0;
   
+  if (rh_event_type != RH_NO_EVENT)
+  {
+	  rh_log("Starting a job while another one is running!\n");
+  }
+
   rh_event_type = type;
+
   if (!SetEvent(rh_event_job))
   {
     rh_log("SetEvent failed (%d)\n", GetLastError());
