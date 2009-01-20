@@ -286,6 +286,13 @@ void rh_start_job(int type)
 #ifdef DEBUG_THREADS
         rh_log("Thread %d: job done\n", GetCurrentThreadId());
 #endif
+        
+        if (rh_event_type != RH_NO_EVENT)
+        {
+          rh_log("Job done event was signaled but job doesn't look done!\n");
+        }
+        
+        //ResetEvent(rh_event_done);
         job_done = 1;
         break;
         
@@ -345,7 +352,6 @@ void rh_process_message()
     rh_result = NUM2DBL(result);
   else
     rh_result = 0.0;
-  rh_job_done();
 }
 
 DWORD WINAPI rh_thread_proc(LPVOID lpParam)
@@ -397,10 +403,7 @@ DWORD WINAPI rh_thread_proc(LPVOID lpParam)
         rh_log("RubyHoldem thread: Wait error (%d)\n", GetLastError());
         return 0; 
     }
-    if (!SetEvent(rh_event_done))
-    {
-      rh_log("SetEvent rh_event_done failed (%d)\n", GetLastError());
-    }
+    rh_job_done();
   }
   ruby_finalize();
 #ifdef DEBUG_THREADS
@@ -423,7 +426,7 @@ void rh_init()
     NULL,                    // default security attributes
     FALSE,                   // auto-reset event
     FALSE,                   // initial state is nonsignaled
-    TEXT("RubyHoldem event job")  // object name
+    NULL  // object name
   );
 
   if (rh_event_job == NULL)
@@ -436,7 +439,7 @@ void rh_init()
     NULL,                    // default security attributes
     FALSE,                   // auto-reset event
     FALSE,                   // initial state is nonsignaled
-    TEXT("RubyHoldem event done")  // object name
+    NULL  // object name
   );
 
   if (rh_event_done == NULL)
@@ -449,7 +452,7 @@ void rh_init()
     NULL,                    // default security attributes
     FALSE,                   // auto-reset event
     FALSE,                   // initial state is nonsignaled
-    TEXT("RubyHoldem symbol resquest")  // object name
+    NULL  // object name
   );
 
   if (rh_event_symbol_request == NULL)
@@ -462,7 +465,7 @@ void rh_init()
     NULL,                    // default security attributes
     FALSE,                   // auto-reset event
     FALSE,                   // initial state is nonsignaled
-    TEXT("RubyHoldem event symbol request done")  // object name
+    NULL  // object name
   );
 
   if (rh_event_symbol_request_done == NULL)
