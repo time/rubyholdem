@@ -116,6 +116,7 @@
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
+				AdditionalIncludeDirectories="ruby"
 				PreprocessorDefinitions="WIN32;NDEBUG;_WINDOWS;_USRDLL;RUBYHOLDEM_EXPORTS;"
 				RuntimeLibrary="2"
 				UsePrecompiledHeader="0"
@@ -135,7 +136,10 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalOptions="/NODEFAULTLIB:library"
+				AdditionalDependencies="msvcr80-ruby18-static.lib Ws2_32.lib"
+				OutputFile="$(OutDir)\whuser.dll"
 				LinkIncremental="2"
+				AdditionalLibraryDirectories="ruby"
 				GenerateDebugInformation="true"
 				SubSystem="2"
 				OptimizeReferences="2"
